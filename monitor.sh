@@ -12,33 +12,34 @@ function vk_init {
 }
 
 function vk_menu {
-	#vk_title "M A I N - M E N U"
-	#echo "[b] Backups"
-	#echo "[n] Networking"
-	#echo "[s] Find a service or port number"
-	#echo "[u] Users"
-	#echo "[w] Watch"
-	#echo "[q] Quit"
-	menu['b']='Backups'
-	menu['n']='Networking'
-	menu['s']='Find service name or port number'
-	vk_choose menu
+	vk_title "M A I N - M E N U"
+	vk_choose 'Backups' 'Networking' 'Services' 'Users' 'Watch'
 	current_submenu=$last_input
 	vk_load
 }
 
 function vk_choose {
-	for menu_item in "${1}"
+	local options=''
+	echo "[m] Main Menu"
+	echo
+	for menu_item in "$@"
 	do
-		echo "[$i] ${1[$i]}"
+		local shortcut=${menu_item:0:1}
+		options=$options','${shortcut,,}
+		echo "["${shortcut,,}"] ${menu_item}"
 	done
+	echo
+	echo "[q] Quit"
 	echo
 	tput bold
 	tput rev
-	echo -n "Enter your choice $1"
+	echo -n "Enter your choice [m$options,q]"
 	tput sgr0
-	echo -n " > "
 	read -n1 last_input
+	case $last_input in
+		'm') vk_menu ;;
+		'q') vk_exit ;;
+	esac
 }
 
 #########################
@@ -48,21 +49,12 @@ function vk_choose {
 ### Backup a folder or directory
 function vk_backups {
 	vk_title "B A C K U P S"
-	echo "[b] Backup a file or directory"
-	echo "[c] Change default backup location. Currently $backup_path"
-	echo "[v] View stored backups"
-	echo "[m] Return to main menu"
-	echo "[q] Quit"
-	vk_choose "[b,c,v..m,q]"
-	case $last_input in 
-		'q')
-			vk_exit ;;
-		'm')
-			vk_menu ;;
+	vk_choose 'Backup a file' 'View stored backups' 'Change backup location'
+	case $last_input in
 		'b')
 			vk_backup ;;
 		'v')
-			vk_title "B A C K U P S - Viewing stored backups"
+			vk_title "Viewing stored backups"
 			ls -lh $backup_path | grep ".tgz" | awk '{printf("%s %s\n",$8,$5)}' | column -t
 			vk_menu2 ;;
 		*)
@@ -96,13 +88,10 @@ function vk_network {
 
 function vk_services {
 	vk_title "S E R V I C E S"
-	echo "[f] Find a port/service"
-	echo "[m] Main Menu"
-	echo "[q] Quit"
-	vk_choose "[f,m,q]"
+	vk_choose 'Find port number or service name'
 	case $last_input in
 		'f')
-			vk_title "Find a port number/service name"
+			vk_title "Find port number or service name"
 			read -p "Please enter the port number or name of service: " last_input
 			cat /etc/services | grep $last_input
 			vk_menu2 ;;
@@ -117,13 +106,7 @@ function vk_services {
 
 function vk_users {
 	vk_title "U S E R S"
-	echo "[c] Check for irregularities"
-	echo "[g] Groups"
-	echo "[s] Sudoers"
-	echo "[u] Users"
-	echo "[m] Main Menu"
-	echo "[q] Quit"
-	vk_choose "[c,g,s,u]"
+	vk_choose 'Check for irregularities' 'Groups' 'Sudoers' 'Users'
 	case $last_input in
 		'q')
 			vk_exit ;;
@@ -140,9 +123,8 @@ function vk_users {
 
 function vk_watch {
 	vk_title "W A T C H"
-	echo "[d] Database commands"
 	echo "watch -n 1 mysqladmin --user=<user> --password=<password> processlist"
-	vk_choose "[d,m,q]"
+	vk_choose 'Database commands'
 }
 
 ########################
