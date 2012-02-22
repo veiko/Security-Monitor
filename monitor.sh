@@ -1,19 +1,24 @@
 #!/bin/bash
+#
+# GTFO Security System
+
 
 #Global variables
 BAK="/usr/srv"
 INPT=""
 
+# Initialize program
 function vk_init {
 	# Check for pv, this is used to view a graphical representation of a processes progress
 	hash pv 2>&- || { vk_install "pv"; }
 	vk_menu
 }
 
+# Draw the main menu
 function vk_menu {
 	vk_title "M A I N - M E N U"
 	vk_choose 'Backups' 'Networking' 'Services' 'Users' 'Watch'
-	SEL=$INPT
+	SEL=$INPT # Set the selected submenu
 	vk_load
 }
 
@@ -61,9 +66,10 @@ function vk_backups {
 	then
 		mkdir $BAK
 	fi
-	vk_choose 'Backup a file' 'View stored backups'
+	vk_choose 'Backup a file' 'Restore backup' 'View stored backups'
 	case $INPT in
 		'b') vk_backup ;;
+		'r') vk_restore ;;
 		'v')
 			vk_title "View stored backups"
 			ls -lh $BAK | grep ".tgz" | awk '{printf("%s %s\n",$8,$5)}' | column -t
@@ -72,25 +78,25 @@ function vk_backups {
 	esac
 }
 
-# Check networking status
+### Networking
 function vk_network {
 	vk_title 'N E T W O R K I N G'
 	vk_choose 'Summary' 'Listening ports' 'Hosts connected'
 	case $INPT in
 		's')
 			vk_title 'Summary'
-			netstat -ant | awk '{print $NF}' | grep -v '[a-z]' | sort | uniq -c ;;
+			netstat -ant | awk '{print $NF}' | grep -v '[a-z]' | sort | uniq -c | awk '{ printf("%s\t%s\t",$2,$1) ; for (i = 0; i < $1; i++) {printf("*")}; print "" }' | column -t ;;
 		'l')
 			vk_title 'Listening ports'
-			vk_bold 'netstat'
+			vk_bold 'netstat -tlnp'
 			netstat -tlnp | grep LISTEN | awk 'BEGIN{print "LOCAL PID/COMMAND\n"}{printf("%s %s\n",$4,$7)}' | column -t
-			vk_bold 'lsof'
-			lsof -Pan -i tcp -i udp | grep LISTEN | awk 'BEGIN{print "COMMAND PID USER LOCAL"}{printf("%s %s %s %s\n",$1,$2,$3,$9)}' | column -t
-			vk_bold 'ss'
+			vk_bold 'lsof -Pan -itcp -iudp'
+			lsof -Pan -itcp -iudp | grep LISTEN | awk 'BEGIN{print "COMMAND PID USER LOCAL"}{printf("%s %s %s %s\n",$1,$2,$3,$9)}' | column -t
+			vk_bold 'ss -alnp'
 			ss -alnp | awk '{printf("%s %s\n",$3,$5)}' | column -t ;;
 		'h')
 			vk_title 'Hosts connected'
-			netstat -an | grep ESTABLISHED | awk '{print $5}' | awk -F: '{print $1}' | sort | uniq -c | awk '{ printf("%s\t%s\t",$2,$1) ; for (i = 0; i < $1; i++) {printf("*")}; print "" }' ;;
+			netstat -an | grep ESTABLISHED | awk '{print $5}' | awk -F: '{print $1}' | sort | uniq -c | awk 'BEGIN{print "HOST CONNECTIONS"}{ printf("%s\t%s\t",$2,$1) ; for (i = 0; i < $1; i++) {printf("*")}; print "" }' | column -t;;
 		*) vk_network ;;
 	esac
 	vk_footer
@@ -141,21 +147,48 @@ function vk_exit {
 }
 
 function vk_backup {
+	local PTH
+	local OTPT
 	vk_title "B A C K U P S - Performing Backup"
 	vk_bold "Path to the file or directory to be backed up: "
-	read -e path
+	read -e PTH
 	### Check that path is valid
-	while [[ -z $path || ! -e $path ]]; do
-		echo "Invalid path: Empty or file does not exist. Please try again."
+	while [[ -z $PTH || ! -e $PTH ]]; do
+		echo "Invalid path: Empty path or file does not exist. Please try again."
 		read -e path
 	done
 	echo
-	vk_bold "List of files already present in $BAK"
+	vk_underline "\nList of files present in $BAK"
 	ls $BAK
-	vk_bold "Name of the file to be created: "
-	read output_file
-	vk_underline "tar -cf - $path | pv -s $(du -sb . | awk '{print $1}') | gzip > $BAK/$output_file.tgz"
-	tar -cf - $path | pv -s $(du -sb . | awk '{print $1}') | gzip > $BAK/$output_file.tgz
+	vk_bold "\nName of the file to be created: "
+	read OTPT
+	vk_underline "tar -cf - $PTH | pv -s $(du -sb . | awk '{print $1}') | gzip > $BAK/$OTPT.tgz"
+	tar -cf - $PTH | pv -s $(du -sb . | awk '{print $1}') | gzip > $BAK/$OTPT.tgz
+	vk_footer
+}
+
+function vk_restore {
+	local FL
+	local PTH
+	vk_title "B A C K U P S - Performing Backup"
+	vk_underline "List of files present in $BAK"
+	ls $BAK
+	vk_bold "Select the file you would like to restore: "
+	read -e FL
+	while [[ -z $FL || ! -e $BAK/$FL ]]; do
+		vk_err "Invalid file. Please try again."
+		read -e FL
+	done
+	vk_bold "Enter the parent directory to where the file will be restored: "
+	read -e PTH
+	while [[ -z $PTH || ! -e $PTH ]]; do
+		vk_err "Invalid path. Please try again."
+		read -e PTH
+	done
+	echo
+	vk_underline "gzip -cd $BAK/$FL | tar -xC $PTH"
+	# Actual backup is not performed yet
+	# gzip -cd $BAK/$FL | tar -xC $PTH
 	vk_footer
 }
 
