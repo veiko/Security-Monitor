@@ -119,7 +119,8 @@ function vk_users {
 			vk_footer ;;
 		'p')
 			vk_title 'Processes'
-			ps hax -o user | sort | uniq -c ;;
+			ps hax -o user | sort | uniq -c | awk '{ printf("%s\t%s\t",$2,$1) ; for (i = 0; i < $1; i++) {printf("*")}; print "" }' | column -t
+			vk_footer ;;
 		*) vk_users ;;
 	esac
 }
@@ -206,7 +207,7 @@ function vk_footer {
 function vk_title {
 	tput clear
 	tput setaf 5
-	vk_bold "GTFO Security Tutorial\n"
+	vk_bold "GTFO Security\n"
 	if [ "${#1}" -gt 0 ]
 	then
 		vk_rev " $1 \n"
