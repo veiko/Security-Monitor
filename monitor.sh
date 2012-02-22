@@ -82,7 +82,12 @@ function vk_network {
 			netstat -ant | awk '{print $NF}' | grep -v '[a-z]' | sort | uniq -c ;;
 		'l')
 			vk_title 'Listening ports'
-			netstat -tlnp | grep LISTEN | awk 'BEGIN{print "LOCAL PID/ProgramName\n"}{printf("%s %s\n",$4,$7)}' | column -t ;;
+			vk_bold 'netstat'
+			netstat -tlnp | grep LISTEN | awk 'BEGIN{print "LOCAL PID/COMMAND\n"}{printf("%s %s\n",$4,$7)}' | column -t
+			vk_bold 'lsof'
+			lsof -Pan -i tcp -i udp | grep LISTEN | awk 'BEGIN{print "COMMAND PID USER LOCAL"}{printf("%s %s %s %s\n",$1,$2,$3,$9)}' | column -t
+			vk_bold 'ss'
+			ss -alnp | awk '{printf("%s %s\n",$3,$5)}' | column -t ;;
 		'h')
 			vk_title 'Hosts connected'
 			netstat -an | grep ESTABLISHED | awk '{print $5}' | awk -F: '{print $1}' | sort | uniq -c | awk '{ printf("%s\t%s\t",$2,$1) ; for (i = 0; i < $1; i++) {printf("*")}; print "" }' ;;
@@ -106,12 +111,15 @@ function vk_services {
 
 function vk_users {
 	vk_title "U S E R S"
-	vk_choose 'Check for irregularities' 'Groups' 'Sudoers' 'Users'
+	vk_choose 'Check for irregularities' 'Groups' 'Sudoers' 'Users' 'Processes'
 	case $INPT in
 		'g')
-			vk_title "Display Groups"
+			vk_title "Groups"
 			awk -F: '{printf("%s %s -> x%s\n",$3,$1,$4)}' /etc/group | column
 			vk_footer ;;
+		'p')
+			vk_title 'Processes'
+			ps hax -o user | sort | uniq -c ;;
 		*) vk_users ;;
 	esac
 }
