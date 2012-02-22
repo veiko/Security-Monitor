@@ -8,21 +8,21 @@ BAK="/usr/srv"
 INPT=""
 
 # Initialize program
-function vk_init {
-	# Check for pv, this is used to view a graphical representation of a processes progress
+vk_init() {
+	# Check whether pv is installed
 	hash pv 2>&- || { vk_install "pv"; }
 	vk_menu
 }
 
-# Draw the main menu
-function vk_menu {
+# Main menu
+vk_menu() {
 	vk_title "M A I N - M E N U"
-	vk_choose 'Backups' 'Networking' 'Services' 'Users' 'Watch'
+	vk_choose 'Backups' 'Iptables' 'Networking' 'Services' 'Users' 'Watch'
 	SEL=$INPT # Set the selected submenu
 	vk_load
 }
 
-function vk_choose {
+vk_choose() {
 	local OPT=''
 	echo -e "[m] Main Menu\n"
 	for ITM in "$@"
@@ -39,14 +39,15 @@ function vk_choose {
 	esac
 }
 
-function vk_prompt {
+vk_prompt() {
 	vk_rev "$1"
 	read -n1 INPT
 }
 
-function vk_load {
+vk_load() {
 	case $INPT in
 		'b') vk_backups ;;
+		'i') vk_iptables ;;
 		'n') vk_network ;;
 		's') vk_services ;;
 		'u') vk_users ;;
@@ -59,8 +60,8 @@ function vk_load {
 ### MAIN MENU OPTIONS ###
 #########################
 
-### Backup a folder or directory
-function vk_backups {
+# Backup a folder or directory
+vk_backups() {
 	vk_title "B A C K U P S"
 	if [ ! -e $BAK ]
 	then
@@ -78,7 +79,27 @@ function vk_backups {
 	esac
 }
 
-### Networking
+# Iptables
+vk_iptables() {
+	vk_title 'I P T A B L E S'
+	vk_choose 'View firewall' 'Clear all rules' 'Default firewall'
+	case $INPT in
+		'c')
+			vk_title "Clear all rules"
+			iptables -F
+			vk_iptables_list
+			vk_footer ;;
+		'd')
+			vk_iptables_defaults ;;
+		'v')
+			vk_title "View firewall"
+			vk_iptables_list
+			vk_footer ;;
+		*) vk_iptables ;;
+	esac
+}
+
+# Networking
 function vk_network {
 	vk_title 'N E T W O R K I N G'
 	vk_choose 'Summary' 'Listening ports' 'Hosts connected'
@@ -245,6 +266,40 @@ function vk_title {
 	then
 		vk_rev " $1 \n"
 	fi
+}
+
+##########################
+### IPTABLES FUNCTIONS ###
+##########################
+
+vk_iptables_list() {
+	iptables -vL | grep -v "Chain" | grep -v 'target' | awk 'BEGIN{print("TARGET;PRT;INT;SOURCE IP;DEST IP")}{printf("%s;%s;%s;%s;%s",$3,$4,$6,$8,$9);$1=$2=$3=$4=$5=$6=$7=$8=$9="";print($0)}' | column -ts\;
+}
+
+vk_iptables_defaults() { 
+	vk_title "Restore defaults"
+#	vk_choose
+#	vk_prompt "Are you sure you want to restore defaults? [y,n]"
+	iptables -F
+	echo "[1] Allow anything on loopback interface"
+	iptables -A INPUT -i lo -j ACCEPT
+	echo "[2] Allow previously established connections"
+	iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+	iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+	echo "[3] Allow inbound SSH connection"
+	iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+	echo "[4] Allow DNS"
+	iptables -A OUTPUT -p udp --sport 1024:65535 --dport 53 -m state --state NEW,ESTABLISHED -j ACCEPT
+	iptables -A INPUT -p udp --sport 53 --dport 1024:65535 -m state --state ESTABLISHED -j ACCEPT
+	iptables -A OUTPUT -p tcp --sport 1024:65535 --dport 53 -m state --state NEW,ESTABLISHED -j ACCEPT
+	iptables -A INPUT -p tcp --sport 53 --dport 1024:65535 -m state --state ESTABLISHED -j ACCEPT
+	echo "[5] Allow connecting to the internet"
+	iptables -A OUTPUT -p tcp --sport 1024:65535 --dport 80 -m state --state NEW,ESTABLISHED -j ACCEPT
+	echo "[6] Set default policy to drop for all other connections"
+	iptables -A INPUT -j DROP
+	iptables -A OUTPUT -j DROP
+	vk_iptables_list
+	vk_footer
 }
 
 trap 'vk_err "\n\nAAAARRRRRGGGGGGGHHHHHHH....\n"; exit;' INT
