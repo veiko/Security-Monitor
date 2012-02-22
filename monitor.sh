@@ -75,19 +75,19 @@ function vk_backups {
 # Check networking status
 function vk_network {
 	vk_title 'N E T W O R K I N G'
-	vk_choose 'Summary'
-	vk_underline "All connections"
-	netstat -ant | awk '{print $NF}' | grep -v '[a-z]' | sort | uniq -c
-	vk_underline "Listening on ports"
-	netstat -tlnp | grep LISTEN | awk 'BEGIN{print "LOCAL PID/ProgramName"}{printf("%s %s\n",$4,$7)}' | column -t
-	vk_underline "Established connections per host"
-	netstat -an | grep ESTABLISHED | awk '{print $5}' | awk -F: '{print $1}' | sort | uniq -c | awk '{ printf("%s\t%s\t",$2,$1) ; for (i = 0; i < $1; i++) {printf("*")}; print "" }'
-#			ssFile="/tmp/ss"
-#		if [ -e "$ssFile" ]
-#		then
-#			diff /tmp/ss <(ss)
-#		fi
-#		ss > /tmp/ss
+	vk_choose 'Summary' 'Listening ports' 'Hosts connected'
+	case $INPT in
+		's')
+			vk_title 'Summary'
+			netstat -ant | awk '{print $NF}' | grep -v '[a-z]' | sort | uniq -c ;;
+		'l')
+			vk_title 'Listening ports'
+			netstat -tlnp | grep LISTEN | awk 'BEGIN{print "LOCAL PID/ProgramName\n"}{printf("%s %s\n",$4,$7)}' | column -t ;;
+		'h')
+			vk_title 'Hosts connected'
+			netstat -an | grep ESTABLISHED | awk '{print $5}' | awk -F: '{print $1}' | sort | uniq -c | awk '{ printf("%s\t%s\t",$2,$1) ; for (i = 0; i < $1; i++) {printf("*")}; print "" }' ;;
+		*) vk_network ;;
+	esac
 	vk_footer
 }
 
