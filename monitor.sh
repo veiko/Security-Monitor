@@ -25,11 +25,18 @@ vk_menu() {
 vk_choose() {
 	local OPT=''
 	echo -e "[m] Main Menu\n"
+	# Iterate through passed parameters
 	for ITM in "$@"
 	do
-		local LTTR=${ITM:0:1}
-		OPT=$OPT','${LTTR,,}
-		echo "["${LTTR,,}"] ${ITM}"
+		local LTTR=''
+		local COUNT=0
+		while [[ "$OPT" == *"$LTTR"* ]]; do		# Check whether this letter has already been used
+			LTTR=${ITM:COUNT:1}									# Get the next letter of the string
+			LTTR=${LTTR,,}
+			((COUNT++))
+		done
+		OPT=$OPT','$LTTR								# Add the letter to the list of options
+		echo "["${LTTR,,}"] "${ITM}						# Add item to the menu
 	done
 	echo -e "\n[q] Quit\n"
 	vk_prompt "Enter your choice [m$OPT,q]"
@@ -129,7 +136,7 @@ function vk_services {
 	case $INPT in
 		'f')
 			vk_title "Find port number or service name"
-			vk_prompt "Please enter the port number or name of service"
+			read -p "Please enter the port number or name of service" INPT
 			cat /etc/services | grep $INPT
 			vk_footer ;;
 		*) vk_services ;;
@@ -138,15 +145,24 @@ function vk_services {
 
 function vk_users {
 	vk_title "U S E R S"
-	vk_choose 'Check for irregularities' 'Groups' 'Sudoers' 'Users' 'Processes'
+	vk_choose 'Check for irregularities' 'Groups' 'Processes run by users' 'Sudoers' 'Users' 
 	case $INPT in
+		'c') echo "Nothing Yet" ;;
 		'g')
 			vk_title "Groups"
-			awk -F: '{printf("%s %s -> x%s\n",$3,$1,$4)}' /etc/group | column
+			awk -F: '{printf("%s %s > %s\n",$3,$1,$4)}' /etc/group | column
 			vk_footer ;;
 		'p')
 			vk_title 'Processes'
 			ps hax -o user | sort | uniq -c | awk '{ printf("%s\t%s\t",$2,$1) ; for (i = 0; i < $1; i++) {printf("*")}; print "" }' | column -t
+			vk_footer ;;
+		's')
+			vk_title 'Sudoers'
+			cat /etc/sudoers
+			vk_footer ;;
+		'u')
+			vk_title 'Users'
+			cat /etc/passwd
 			vk_footer ;;
 		*) vk_users ;;
 	esac
