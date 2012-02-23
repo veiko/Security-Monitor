@@ -145,8 +145,12 @@ function vk_services {
 
 function vk_users {
 	vk_title "U S E R S"
-	vk_choose 'Check for irregularities' 'Groups' 'Processes run by users' 'Sudoers' 'Users' 
+	vk_choose 'All Users' 'Check for irregularities' 'Groups' 'Processes run by users' 'Sudoers' 'User Details' 
 	case $INPT in
+		'a')
+			vk_title 'All Users'
+			cat /etc/passwd
+			vk_footer ;;
 		'c') echo "Nothing Yet" ;;
 		'g')
 			vk_title "Groups"
@@ -154,15 +158,24 @@ function vk_users {
 			vk_footer ;;
 		'p')
 			vk_title 'Processes'
-			ps hax -o user | sort | uniq -c | awk '{ printf("%s\t%s\t",$2,$1) ; for (i = 0; i < $1; i++) {printf("*")}; print "" }' | column -t
+			ps hax -o user | sort | uniq -c | awk '{printf("%s\t%s\t",$2,$1);for(i=0;i<$1;i++){printf("*")};print("")}' | column -t
 			vk_footer ;;
 		's')
 			vk_title 'Sudoers'
 			cat /etc/sudoers
 			vk_footer ;;
 		'u')
-			vk_title 'Users'
-			cat /etc/passwd
+			vk_title 'User Details'
+			awk -F: 'BEGIN{print("USER:GROUP:DETAILS:HOME DIR:SHELL")}{printf("%s %s:%s:%s:%s:%s\n",$3,$1,$4,$5,$6,$7)}' /etc/passwd | column -ts:
+			read -p "Enter a users ID to view further details" INPT
+			local USER=`getent passwd $INPT`
+			USER=${USER%%:*}
+			vk_title 'User Information: '$USER
+			id $USER
+			echo
+			ps af -u $USER
+			echo
+			chage -l $USER
 			vk_footer ;;
 		*) vk_users ;;
 	esac
@@ -280,7 +293,7 @@ function vk_title {
 	vk_bold "GTFO Security\n"
 	if [ "${#1}" -gt 0 ]
 	then
-		vk_rev " $1 \n"
+		vk_rev " $* \n"
 	fi
 }
 
