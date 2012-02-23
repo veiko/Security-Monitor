@@ -1,5 +1,7 @@
 #!/bin/bash
 #
+# A script to monitor various security items
+#
 # GTFO Security System
 
 
@@ -35,14 +37,14 @@ vk_choose() {
 			LTTR=${LTTR,,}
 			((COUNT++))
 		done
-		OPT=$OPT','$LTTR								# Add the letter to the list of options
+		OPT=$OPT','$LTTR											# Add the letter to the list of options
 		echo "["${LTTR,,}"] "${ITM}						# Add item to the menu
 	done
 	echo -e "\n[q] Quit\n"
 	vk_prompt "Enter your choice [m$OPT,q]"
-	case $INPT in
-		'm') vk_menu ;;
-		'q') vk_exit ;;
+	case $INPT in														# The two options m & q are always available
+		'm') vk_menu ;;												# [m] Main Menu
+		'q') vk_exit ;;												# [q] Quit
 	esac
 }
 
@@ -89,7 +91,7 @@ vk_backups() {
 # Iptables
 vk_iptables() {
 	vk_title 'I P T A B L E S'
-	vk_choose 'View firewall' 'Clear all rules' 'Default firewall'
+	vk_choose 'View firewall' 'Clear all rules' 'Save rules' 'Restore rules' 'Default firewall'
 	case $INPT in
 		'c')
 			vk_title "Clear all rules"
@@ -98,6 +100,8 @@ vk_iptables() {
 			vk_footer ;;
 		'd')
 			vk_iptables_defaults ;;
+		'r') vk_iptables_restore ;;
+		's') vk_iptables_save ;;
 		'v')
 			vk_title "View firewall"
 			vk_iptables_list
@@ -130,6 +134,7 @@ function vk_network {
 	vk_footer
 }
 
+# Services
 function vk_services {
 	vk_title "S E R V I C E S"
 	vk_choose 'Find port number or service name'
@@ -143,6 +148,7 @@ function vk_services {
 	esac
 }
 
+# Users
 function vk_users {
 	vk_title "U S E R S"
 	vk_choose 'All Users' 'Check for irregularities' 'Groups' 'Processes run by users' 'Sudoers' 'User Details' 
@@ -183,8 +189,16 @@ function vk_users {
 
 function vk_watch {
 	vk_title "W A T C H"
-	echo "watch -n 1 mysqladmin --user=<user> --password=<password> processlist"
-	vk_choose 'Database commands'
+	vk_choose 'Find files with setuid' 'Last commands performed in MySql'
+	case $INPT in
+		'f')
+			find / -type f \( -perm -4000 -o -perm -2000 \) -print
+			vk_footer ;;
+		'l')
+			echo 'watch -n 1 mysqladmin --user=<user> --password=<password> processlist'
+			vk_footer ;;
+		*) vk_watch ;;
+	esac
 }
 
 ########################
@@ -307,27 +321,52 @@ vk_iptables_list() {
 
 vk_iptables_defaults() { 
 	vk_title "Restore defaults"
-#	vk_choose
-#	vk_prompt "Are you sure you want to restore defaults? [y,n]"
-	iptables -F
-	echo "[1] Allow anything on loopback interface"
-	iptables -A INPUT -i lo -j ACCEPT
-	echo "[2] Allow previously established connections"
-	iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-	iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-	echo "[3] Allow inbound SSH connection"
-	iptables -A INPUT -p tcp --dport 22 -j ACCEPT
-	echo "[4] Allow DNS"
-	iptables -A OUTPUT -p udp --sport 1024:65535 --dport 53 -m state --state NEW,ESTABLISHED -j ACCEPT
-	iptables -A INPUT -p udp --sport 53 --dport 1024:65535 -m state --state ESTABLISHED -j ACCEPT
-	iptables -A OUTPUT -p tcp --sport 1024:65535 --dport 53 -m state --state NEW,ESTABLISHED -j ACCEPT
-	iptables -A INPUT -p tcp --sport 53 --dport 1024:65535 -m state --state ESTABLISHED -j ACCEPT
-	echo "[5] Allow connecting to the internet"
-	iptables -A OUTPUT -p tcp --sport 1024:65535 --dport 80 -m state --state NEW,ESTABLISHED -j ACCEPT
-	echo "[6] Set default policy to drop for all other connections"
-	iptables -A INPUT -j DROP
-	iptables -A OUTPUT -j DROP
-	vk_iptables_list
+	vk_prompt "Are you sure you want to restore defaults? [y,n]"
+	if [ $INPT = 'y' ]
+	then
+		iptables -F
+		echo "[1] Allow anything on loopback interface"
+		iptables -A INPUT -i lo -j ACCEPT
+		echo "[2] Allow previously established connections"
+		iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+		iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+		echo "[3] Allow inbound SSH connection"
+		iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+		echo "[4] Allow DNS"
+		iptables -A OUTPUT -p udp --sport 1024:65535 --dport 53 -m state --state NEW,ESTABLISHED -j ACCEPT
+		iptables -A INPUT -p udp --sport 53 --dport 1024:65535 -m state --state ESTABLISHED -j ACCEPT
+		iptables -A OUTPUT -p tcp --sport 1024:65535 --dport 53 -m state --state NEW,ESTABLISHED -j ACCEPT
+		iptables -A INPUT -p tcp --sport 53 --dport 1024:65535 -m state --state ESTABLISHED -j ACCEPT
+		echo "[5] Allow connecting to the internet"
+		iptables -A OUTPUT -p tcp --sport 1024:65535 --dport 80 -m state --state NEW,ESTABLISHED -j ACCEPT
+		echo "[6] Set default policy to drop for all other connections"
+		iptables -A INPUT -j DROP
+		iptables -A OUTPUT -j DROP
+		vk_footer
+	else
+		vk_iptables
+	fi
+}
+
+# Restore saved iptables
+vk_iptables_restore() {
+	vk_title "Restoring iptables"
+	gpg -o $BAK/selbatpi $BAK/selbatpi.gtfo							# Unencrypt rules file
+	`which iptables-restore` < $BAK/selbatpi						# Restore from encrypted file to avoid polluted rules
+	rm $BAK/selbatpi																		# Remove unencrypted file
+	vk_bold "Iptables restored succesfully"
+	vk_footer
+}
+
+# Save iptables
+vk_iptables_save() {
+	vk_title "Saving iptables"
+	`which iptables-save` > /etc/default/iptables				# Save iptables to default location
+	`which iptables-save` > $BAK/selbatpi								# Save to file in backup folder as well
+	gpg -c $BAK/selbatpi																# Encrypt saved rules
+	rm $BAK/selbatpi																		# Remove unencrypted version
+	mv $BAK/selbatpi.gpg $BAK/selbatpi.gtfo							# Rename gpg to something less obvious
+	vk_bold "Iptables saved succesfully"
 	vk_footer
 }
 
